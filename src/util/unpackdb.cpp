@@ -5,6 +5,8 @@
 #include "FileUtil.h"
 #include "Debug.h"
 
+#include <unordered_set>
+
 #ifdef OPENMP
 #include <omp.h>
 #endif
@@ -35,10 +37,19 @@ int unpackdb(int argc, const char **argv, const Command& command) {
         thread_idx = static_cast<unsigned int>(omp_get_thread_num());
 #endif
 
+        std::unordered_set<unsigned int> keys;
 #pragma omp for schedule(dynamic, 100)
         for (size_t i = 0; i < entries; ++i) {
             progress.updateProgress();
             unsigned int key = reader.getDbKey(i);
+            bool skip = false;
+#pragma omp critical
+            {
+                skip = !keys.insert(key).second;
+            };
+            if(skip) {
+                continue;
+            }
             std::string name = par.db2;
             if (name.back() != '/') {
                 name.append(1, '/');
